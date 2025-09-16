@@ -1,0 +1,349 @@
+<!--
+Ayurvedic Diet Management - Frontend (single-file)
+Open this file in VS Code and use Live Server (or open in browser) to preview.
+This is a simple, responsive, attractive HTML/CSS prototype with light JS to demo:
+- Patient form
+- Food quick-add (mock DB entries)
+- Auto-generate a simple Ayurveda-compliant diet chart preview
+- Printable diet card
+
+Notes for VS Code:
+1. Save as "index.html" and open with Live Server extension OR double-click the file.
+2. No external libraries required.
+3. To extend: replace `mockFoods` in the script with a real DB/API.
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ayurvedic Diet Management — Prototype</title>
+  <style>
+    :root{
+      --bg:#f6faf8;
+      --card:#ffffff;
+      --muted:#65737e;
+      --accent:#2b8a78; /* teal */
+      --accent-2:#f08a5d; /* warm */
+      --glass: rgba(255,255,255,0.6);
+      --shadow: 0 6px 18px rgba(24,39,51,0.08);
+      --radius:14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:linear-gradient(180deg,var(--bg),#eef7f4); color:#10303a; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    header{
+      display:flex;align-items:center;justify-content:space-between;padding:28px 40px; gap:20px;
+    }
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:white;font-weight:700;font-size:20px;box-shadow:var(--shadow)}
+    h1{margin:0;font-size:20px}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    main{display:grid;grid-template-columns:420px 1fr;gap:28px;padding:0 40px 60px}
+
+    /* Left: Controls */
+    .panel{background:var(--card);padding:20px;border-radius:12px;box-shadow:var(--shadow)}
+    .panel h2{margin:0 0 12px;font-size:16px}
+    .form-row{display:flex;gap:10px;margin-bottom:10px}
+    label{font-size:13px;color:var(--muted)}
+    input[type=text], input[type=number], select, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef0;background:#fbffff}
+    textarea{min-height:72px}
+    .small{font-size:13px;color:var(--muted)}
+    button{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
+    .btn-ghost{background:none;border:1px solid #e6eef0;color:var(--accent);padding:8px 10px}
+
+    /* Food Quick-add */
+    .food-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:190px;overflow:auto;padding-top:8px}
+    .food-card{background:linear-gradient(180deg, rgba(43,138,120,0.06), rgba(240,138,93,0.03));padding:8px;border-radius:10px;border:1px solid rgba(16,48,58,0.04);display:flex;align-items:center;justify-content:space-between}
+    .food-meta{font-size:13px;color:#0f2930}
+    .badge{font-size:12px;padding:6px;border-radius:8px;background:rgba(16,48,58,0.06)}
+
+    /* Right: Preview area */
+    .preview{padding:18px;border-radius:12px;min-height:520px}
+    .hero{display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .hero-left h3{margin:0;font-size:18px}
+    .stats{display:flex;gap:12px}
+    .stat{background:var(--glass);padding:10px;border-radius:10px;min-width:110px;text-align:center;box-shadow:0 4px 14px rgba(16,48,58,0.03)}
+    .stat small{display:block;color:var(--muted)}
+
+    .diet-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+    .diet-card{background:linear-gradient(180deg,white, #fbffff);padding:12px;border-radius:12px;border:1px solid #eef6f5}
+    .diet-card h4{margin:0 0 8px}
+    .meal-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eef6f5;font-size:14px}
+    .meal-item:last-child{border-bottom:0}
+
+    footer{padding:30px 40px;color:var(--muted);font-size:13px}
+
+    /* Responsive */
+    @media (max-width:980px){main{grid-template-columns:1fr; padding:0 18px 40px} .diet-grid{grid-template-columns:1fr 1fr}}
+    @media (max-width:560px){.diet-grid{grid-template-columns:1fr}}
+
+    /* Printable card style */
+    @media print{
+      body{background:white}
+      header, footer, .controls{display:none}
+      main{grid-template-columns:1fr !important}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">AD</div>
+      <div>
+        <h1>Ayurvedic Diet Management</h1>
+        <p>Prototype UI — Ayurveda-aware diet charts with nutrient + rasa tagging</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="btn-ghost" onclick="printDiet()">Print Diet Chart</button>
+      <button onclick="downloadSample()">Download JSON</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Controls -->
+    <div>
+      <div class="panel controls">
+        <h2>Patient Profile</h2>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Name</label>
+            <input id="pName" type="text" placeholder="e.g., Meera Sharma"/>
+          </div>
+          <div style="width:110px">
+            <label>Age</label>
+            <input id="pAge" type="number" min="0" value="30"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Gender</label>
+            <select id="pGender"><option>Female</option><option>Male</option><option>Other</option></select>
+          </div>
+          <div style="width:170px">
+            <label>Meal Frequency</label>
+            <select id="mealFreq"><option>3</option><option>4</option><option>5</option></select>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label>Dietary Habits / Notes</label>
+          <textarea id="pNotes" placeholder="veg / non-veg / food allergies / digestion patterns"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button onclick="saveProfile()">Save Profile</button>
+          <button class="btn-ghost" onclick="resetProfile()">Reset</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <h2>Food Quick-Add</h2>
+        <p class="small">Search and add foods from quick database (mock). Each item includes simple Ayurveda tags.</p>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="foodSearch" type="text" placeholder="Search foods: e.g., Roti, Rice, Mung dal" oninput="filterFoods()"/>
+          <button class="btn-ghost" onclick="showAll()">All</button>
+        </div>
+
+        <div id="foodList" class="food-list" style="margin-top:8px">
+          <!-- food cards injected by JS -->
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <input id="customFoodName" type="text" placeholder="Add custom food (name)"/>
+          <button onclick="addCustomFood()">Add</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <h2>Recipe Builder (simple)</h2>
+        <p class="small">Combine multiple foods into a recipe and auto-calc totals.</p>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <select id="recipeSelect"></select>
+          <input id="recipeServings" type="number" value="1" min="1" style="width:90px"/>
+          <button onclick="addRecipe()">Insert into Chart</button>
+        </div>
+        <div id="recipePreview" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <!-- Right Column: Preview -->
+    <div class="panel preview">
+      <div class="hero">
+        <div class="hero-left">
+          <h3>Diet Chart Preview</h3>
+          <p class="small">Auto-generated, Ayurveda-tagged and nutritionally summarized diet suggestion</p>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong id="totalCals">0</strong><small>kcal/day</small></div>
+          <div class="stat"><strong id="rasaSummary">—</strong><small>Main Rasa</small></div>
+          <div class="stat"><strong id="propertySummary">—</strong><small>Property</small></div>
+        </div>
+      </div>
+
+      <div class="diet-grid" id="dietGrid">
+        <div class="diet-card">
+          <h4>Breakfast</h4>
+          <div id="breakfastList"></div>
+        </div>
+        <div class="diet-card">
+          <h4>Lunch</h4>
+          <div id="lunchList"></div>
+        </div>
+        <div class="diet-card">
+          <h4>Dinner</h4>
+          <div id="dinnerList"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <button onclick="autoGenerate()">Auto-generate Balanced Chart</button>
+        <button class="btn-ghost" onclick="clearChart()">Clear</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <h4>Selected Foods (editable)</h4>
+        <div id="selectedFoods"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    Prototype UI — Designed for Ayurvedic practitioners. Replace mock data with real food database & nutrient engine.
+  </footer>
+
+  <script>
+    // --- Mock food database ---
+    const mockFoods = [
+      {id:1, name:'Jowar Roti (1)', kcal:110, rasa:'Sweet', property:'Warm', tags:['Easy digest']},
+      {id:2, name:'Steamed Rice (100g)', kcal:130, rasa:'Sweet', property:'Cold', tags:['Light']},
+      {id:3, name:'Mung Dal (1 cup)', kcal:150, rasa:'Astringent', property:'Warm', tags:['Protein-rich']},
+      {id:4, name:'Buttermilk (200ml)', kcal:40, rasa:'Sour', property:'Cooling', tags:['Hydrating']},
+      {id:5, name:'Ghee (1 tsp)', kcal:45, rasa:'Sweet', property:'Heating', tags:['Ojas boosting']},
+      {id:6, name:'Kitchari (1 bowl)', kcal:320, rasa:'Sweet & Astringent', property:'Balancing', tags:['Tridoshic']},
+      {id:7, name:'Green Salad (100g)', kcal:70, rasa:'Bitter', property:'Cooling', tags:['Fiber']},
+      {id:8, name:'Masala Chai (200ml)', kcal:88, rasa:'Pungent', property:'Heating', tags:['Stimulating']}
+    ];
+
+    // App state
+    let profile = {};
+    let selected = [];
+
+    // Initialize
+    function init(){
+      renderFoodList(mockFoods);
+      populateRecipes();
+    }
+
+    function renderFoodList(list){
+      const container = document.getElementById('foodList'); container.innerHTML='';
+      list.forEach(f=>{
+        const el = document.createElement('div'); el.className='food-card';
+        el.innerHTML = `<div style="display:flex;flex-direction:column">
+          <div class=\"food-meta\">${f.name}</div>
+          <div class=\"small\">${f.rasa} • ${f.property} • ${f.kcal} kcal</div>
+        </div>
+        <div style=\"display:flex;flex-direction:column;gap:6px;align-items:flex-end\">
+          <div class=\"badge\">${f.tags[0]||''}</div>
+          <button onclick='addFood(${f.id})' style=\"background:none;border:0;color:var(--accent);cursor:pointer;font-weight:600\">Add</button>
+        </div>`;
+        container.appendChild(el);
+      });
+    }
+
+    function filterFoods(){
+      const q = document.getElementById('foodSearch').value.toLowerCase();
+      const filtered = mockFoods.filter(f=>f.name.toLowerCase().includes(q) || (f.tags && f.tags.join(' ').toLowerCase().includes(q)));
+      renderFoodList(filtered);
+    }
+    function showAll(){ document.getElementById('foodSearch').value=''; renderFoodList(mockFoods);} 
+
+    function addCustomFood(){
+      const name = document.getElementById('customFoodName').value.trim(); if(!name) return alert('Enter food name');
+      const id = mockFoods.length+1; const item={id,name,kcal:80,rasa:'Unknown',property:'Neutral',tags:['Custom']};
+      mockFoods.push(item); renderFoodList(mockFoods); document.getElementById('customFoodName').value='';
+    }
+
+    function addFood(id){
+      const food = mockFoods.find(f=>f.id===id); if(!food) return;
+      selected.push(JSON.parse(JSON.stringify(food)));
+      renderSelected();
+    }
+
+    function renderSelected(){
+      const c = document.getElementById('selectedFoods'); c.innerHTML='';
+      let total=0; let rasaCount={}, propCount={};
+      selected.forEach((f,idx)=>{
+        total += f.kcal || 0;
+        rasaCount[f.rasa] = (rasaCount[f.rasa]||0)+1;
+        propCount[f.property] = (propCount[f.property]||0)+1;
+        const div = document.createElement('div'); div.className='meal-item';
+        div.innerHTML = `<div style=\"display:flex;gap:10px;align-items:center\"><strong>${f.name}</strong><span class=\"small\">${f.rasa} • ${f.property}</span></div>
+        <div style=\"display:flex;gap:8px;align-items:center\"><span class=\"small\">${f.kcal} kcal</span><button onclick='removeItem(${idx})' class=\"btn-ghost\">Remove</button></div>`;
+        c.appendChild(div);
+      });
+
+      document.getElementById('totalCals').innerText = total;
+      const mainRasa = Object.keys(rasaCount).length? Object.keys(rasaCount).reduce((a,b)=> rasaCount[a]>rasaCount[b]?a:b):'—';
+      const mainProp = Object.keys(propCount).length? Object.keys(propCount).reduce((a,b)=> propCount[a]>propCount[b]?a:b):'—';
+      document.getElementById('rasaSummary').innerText = mainRasa;
+      document.getElementById('propertySummary').innerText = mainProp;
+
+      // populate meal lists crudely
+      const meals = {breakfast:[], lunch:[], dinner:[]};
+      selected.forEach((f,i)=>{ if(i%3===0) meals.breakfast.push(f); else if(i%3===1) meals.lunch.push(f); else meals.dinner.push(f); });
+      ['breakfastList','lunchList','dinnerList'].forEach(id=>document.getElementById(id).innerHTML='');
+      meals.breakfast.forEach(f=>document.getElementById('breakfastList').innerHTML += `<div class="meal-item"><div>${f.name}</div><div>${f.kcal} kcal</div></div>`);
+      meals.lunch.forEach(f=>document.getElementById('lunchList').innerHTML += `<div class="meal-item"><div>${f.name}</div><div>${f.kcal} kcal</div></div>`);
+      meals.dinner.forEach(f=>document.getElementById('dinnerList').innerHTML += `<div class="meal-item"><div>${f.name}</div><div>${f.kcal} kcal</div></div>`);
+    }
+
+    function removeItem(i){ selected.splice(i,1); renderSelected(); }
+
+    function autoGenerate(){
+      // Simple auto-generate: pick 3-6 items aiming for 1800 kcal baseline scaled by age/sex
+      selected = [];
+      const baseline = 1800; // naive
+      const age = Number(document.getElementById('pAge').value)||30; const gender = document.getElementById('pGender').value;
+      let target = baseline;
+      if(gender==='Male') target += 200; if(age<12) target = 1400; if(age>60) target -= 200;
+
+      let sum=0; let pool=[...mockFoods].sort(()=>Math.random()-0.5);
+      let idx=0;
+      while(sum < target && idx < pool.length*2){
+        const f = pool[idx % pool.length]; selected.push(f); sum += f.kcal; idx++;
+        if(selected.length>9) break;
+      }
+      renderSelected();
+    }
+
+    function clearChart(){ selected=[]; renderSelected(); }
+
+    function saveProfile(){ profile = {name:document.getElementById('pName').value, age:document.getElementById('pAge').value, gender:document.getElementById('pGender').value, notes:document.getElementById('pNotes').value}; alert('Profile saved (local state)'); }
+    function resetProfile(){ document.getElementById('pName').value=''; document.getElementById('pAge').value='30'; document.getElementById('pNotes').value=''; }
+
+    // Simple recipe handling
+    function populateRecipes(){
+      const recipes = [ {id:1, name:'Kitchari Bowl', items:[1,3,5]}, {id:2, name:'Light Lunch', items:[2,6,4]} ];
+      const sel = document.getElementById('recipeSelect'); sel.innerHTML=''; recipes.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.innerText=r.name; sel.appendChild(o); });
+      window._recipes = recipes;
+    }
+    function addRecipe(){ const id = Number(document.getElementById('recipeSelect').value); const r = window._recipes.find(x=>x.id===id); if(!r) return; r.items.forEach(i=>{ const f = mockFoods.find(x=>x.id===i); if(f) selected.push(f); }); renderSelected(); document.getElementById('recipePreview').innerText = 'Inserted recipe: ' + (r? r.name:''); }
+
+    // print & download
+    function printDiet(){ window.print(); }
+    function downloadSample(){ const data={profile,selected}; const blob=new Blob([JSON.stringify(data, null, 2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='diet-sample.json'; a.click(); URL.revokeObjectURL(url); }
+
+    function removeAll(){ selected=[]; renderSelected(); }
+
+    init();
+  </script>
+</body>
+</html>
